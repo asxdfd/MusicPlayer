@@ -10,7 +10,7 @@ import cn.bmob.v3.BmobObject;
  * Student ID: 16301170
  * date: 2018/12/26
  */
-public class Music extends BmobObject {
+public class Music {
     private String name;
     private String singer;
     private String url;

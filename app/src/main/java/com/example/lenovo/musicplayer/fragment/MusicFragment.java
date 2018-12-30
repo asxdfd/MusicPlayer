@@ -1,26 +1,13 @@
 package com.example.lenovo.musicplayer.fragment;
 
-import android.annotation.SuppressLint;
-import android.content.ComponentName;
-import android.content.ContentResolver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
-import android.database.Cursor;
-import android.net.Uri;
+import android.app.Activity;
 import android.os.Bundle;
-import android.os.IBinder;
-import android.provider.MediaStore;
 import android.support.v4.app.Fragment;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageButton;
+import android.widget.AdapterView;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -28,21 +15,9 @@ import android.widget.TextView;
 import com.example.lenovo.musicplayer.R;
 import com.example.lenovo.musicplayer.activity.MainActivity;
 import com.example.lenovo.musicplayer.model.Music;
-import com.example.lenovo.musicplayer.model.Video;
-import com.example.lenovo.musicplayer.service.PlayService;
-import com.example.lenovo.musicplayer.util.CustomTouchListener;
 import com.example.lenovo.musicplayer.util.MusicListAdapter;
-import com.example.lenovo.musicplayer.util.StorageUtil;
-import com.example.lenovo.musicplayer.util.VideoListAdapter;
-import com.example.lenovo.musicplayer.util.onItemClickListener;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import cn.bmob.v3.BmobQuery;
-import cn.bmob.v3.exception.BmobException;
-import cn.bmob.v3.listener.FindListener;
-import fm.jiecao.jcvideoplayer_lib.JCVideoPlayer;
+import com.example.lenovo.musicplayer.util.MusicUtil;
+import com.nostra13.universalimageloader.utils.L;
 
 public class MusicFragment extends Fragment implements View.OnClickListener {
 
@@ -50,8 +25,18 @@ public class MusicFragment extends Fragment implements View.OnClickListener {
     private static final String ARG_COLUMN_COUNT = "column-count";
     // TODO: Customize parameters
     private int mColumnCount = 1;
-    private List<Music> audioList = new ArrayList<>();
-    boolean isPlay = false;
+    private MusicListAdapter mMusicListAdapter = new MusicListAdapter();
+
+    private MainActivity mActivity;
+    private ListView mMusicListView;
+    private TextView mMusicTitle;
+    private TextView mMusicArtist;
+
+    private ImageView mPreImageView;
+    private ImageView mPlayImageView;
+    private ImageView mNextImageView;
+
+    private boolean isPause;
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
      * fragment (e.g. upon screen orientation changes).
@@ -78,35 +63,25 @@ public class MusicFragment extends Fragment implements View.OnClickListener {
         }
     }
 
-    @SuppressLint("WrongViewCast")
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.music_list, container, false);
-        final RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.list_music);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
-        recyclerView.addOnItemTouchListener(new CustomTouchListener(view.getContext(), new onItemClickListener() {
-            @Override
-            public void onClick(View view, int index) {
-                playAudio(index);
-            }
-        }));
-        ((ImageView) view.findViewById(R.id.btn_previous)).setOnClickListener(this);
-        ((ImageView) view.findViewById(R.id.btn_play)).setOnClickListener(this);
-        ((ImageView) view.findViewById(R.id.btn_next)).setOnClickListener(this);
-        BmobQuery<Music> bmobQuery = new BmobQuery<Music>();
-        bmobQuery.findObjects(new FindListener<Music>() {
-            @Override
-            public void done(List<Music> list, BmobException e) {
-                if (e == null) {
-                    System.out.println(System.currentTimeMillis() + "r");
-                    audioList.addAll(list);
-                    recyclerView.setAdapter(new MusicListAdapter(list, getActivity()));
-                } else {
-                    Log.e("BMOB", e.getMessage());
-                }
-            }
-        });
+
+        mMusicListView = (ListView) view.findViewById(R.id.list_music);
+        mMusicTitle = (TextView) view.findViewById(R.id.music_name);
+        mMusicArtist = (TextView) view.findViewById(R.id.music_singer);
+        mPreImageView = (ImageView) view.findViewById(R.id.btn_previous);
+        mPlayImageView = (ImageView) view.findViewById(R.id.btn_play);
+        mNextImageView = (ImageView) view.findViewById(R.id.btn_next);
+
+        mMusicListView.setAdapter(mMusicListAdapter);
+        mMusicListView.setOnItemClickListener(mMusicItemClickListener);
+
+        mPreImageView.setOnClickListener(this);
+        mPlayImageView.setOnClickListener(this);
+        mNextImageView.setOnClickListener(this);
+
         return view;
     }
 
@@ -116,9 +91,22 @@ public class MusicFragment extends Fragment implements View.OnClickListener {
     }
 
     @Override
+    public void onStart() {
+        super.onStart();
+        L.i("fragment", "onViewCreated");
+        mActivity.allowBindService();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        isPause = false;
+    }
+
+    @Override
     public void onPause() {
+        isPause = true;
         super.onPause();
-        JCVideoPlayer.releaseAllVideos();
     }
 
     @Override
@@ -126,54 +114,102 @@ public class MusicFragment extends Fragment implements View.OnClickListener {
         return super.onOptionsItemSelected(item);
     }
 
-    private void playAudio(int audioIndex) {
-        //Check is service is active
-        if (!((MainActivity) getActivity()).getServiceBound()) {
-            //Store Serializable audioList to SharedPreferences
-            StorageUtil storage = new StorageUtil(getActivity().getApplicationContext());
-            storage.storeAudio((ArrayList<Music>) audioList);
-            storage.storeAudioIndex(audioIndex);
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+        mActivity = (MainActivity) activity;
+    }
 
-            Intent playerIntent = new Intent(getActivity(), PlayService.class);
-            getActivity().startService(playerIntent);
-            getActivity().bindService(playerIntent, ((MainActivity) getActivity()).getServiceConnection(), Context.BIND_AUTO_CREATE);
-        } else {
-            //Store the new audioIndex to SharedPreferences
-            StorageUtil storage = new StorageUtil(getActivity().getApplicationContext());
-            storage.storeAudioIndex(audioIndex);
+    public void onStop() {
+        super.onStop();
+        L.i("fragment", "onDestroyView");
+        mActivity.allowUnbindService();
+    }
 
-            //Service is active
-            //Send a broadcast to the service -> PLAY_NEW_AUDIO
-            Intent broadcastIntent = new Intent("com.example.lenovo.musicplayer.PlayNewAudio");
-            getActivity().sendBroadcast(broadcastIntent);
+    private AdapterView.OnItemClickListener mMusicItemClickListener = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position,
+                                long id) {
+            play(position);
         }
-        isPlay = true;
-        ((ImageView) getActivity().findViewById(R.id.btn_play)).setImageResource(R.drawable.new_pause_video);
-        ((TextView) getActivity().findViewById(R.id.music_name)).setText(audioList.get(audioIndex).getName());
-        ((TextView) getActivity().findViewById(R.id.music_singer)).setText(audioList.get(audioIndex).getSinger());
+    };
+
+    private void onItemPlay(int position) {
+        // 将ListView列表滑动到播放的歌曲的位置，是播放的歌曲可见
+        mMusicListView.smoothScrollToPosition(position);
+        // 获取上次播放的歌曲的position
+        int prePlayingPosition = mMusicListAdapter.getPlayingPosition();
+
+        // 设置新的播放位置
+        mMusicListAdapter.setPlayingPosition(position);
+
+        // 如果新的播放位置不在可视区域
+        // 则直接返回
+        if (mMusicListView.getLastVisiblePosition() < position
+                || mMusicListView.getFirstVisiblePosition() > position)
+            return;
+
+        // 如果在可视区域
+        // 手动设置改item visible
+        int currentItem = position - mMusicListView.getFirstVisiblePosition();
+        ((ViewGroup) mMusicListView.getChildAt(currentItem)).getChildAt(0)
+                .setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * 播放音乐item
+     *
+     * @param position
+     */
+    private void play(int position) {
+        int pos = mActivity.getPlayService().play(position);
+        onPlay(pos);
+    }
+
+    /**
+     * 播放时，更新控制面板
+     *
+     * @param position
+     */
+    public void onPlay(int position) {
+        if (MusicUtil.sMusicList.isEmpty() || position < 0)
+            return;
+        //设置进度条的总长度
+        onItemPlay(position);
+
+        Music music = MusicUtil.sMusicList.get(position);
+        mMusicTitle.setText(music.getName());
+        mMusicArtist.setText(music.getSinger());
+
+        if (mActivity.getPlayService().isPlaying()) {
+            mPlayImageView.setImageResource(android.R.drawable.ic_media_pause);
+        } else {
+            mPlayImageView.setImageResource(android.R.drawable.ic_media_play);
+        }
     }
 
     @Override
     public void onClick(View v) {
-        Intent broadcastIntent;
         switch (v.getId()) {
-            case R.id.btn_previous:
-                broadcastIntent = new Intent("com.example.lenovo.musicplayer.ACTION_PREVIOUS");
-                getActivity().sendBroadcast(broadcastIntent);
             case R.id.btn_play:
-                if (isPlay) {
-                    ((ImageView) getActivity().findViewById(R.id.btn_play)).setImageResource(R.drawable.new_play_video);
-                    broadcastIntent = new Intent("com.example.lenovo.musicplayer.ACTION_PLAY");
-                    isPlay = false;
+                if (mActivity.getPlayService().isPlaying()) {
+                    mActivity.getPlayService().pause(); // 暂停
+                    mPlayImageView
+                            .setImageResource(android.R.drawable.ic_media_play);
                 } else {
-                    ((ImageView) getActivity().findViewById(R.id.btn_play)).setImageResource(R.drawable.new_pause_video);
-                    broadcastIntent = new Intent("com.example.lenovo.musicplayer.ACTION_PAUSE");
-                    isPlay = true;
+                    onPlay(mActivity.getPlayService().resume()); // 播放
                 }
-                getActivity().sendBroadcast(broadcastIntent);
+                break;
             case R.id.btn_next:
-                broadcastIntent = new Intent("com.example.lenovo.musicplayer.ACTION_NEXT");
-                getActivity().sendBroadcast(broadcastIntent);
+                mActivity.getPlayService().next(); // 下一曲
+                break;
+            case R.id.btn_previous:
+                mActivity.getPlayService().pre(); // 上一曲
+                break;
         }
+    }
+
+    public MusicListAdapter getmMusicListAdapter() {
+        return mMusicListAdapter;
     }
 }

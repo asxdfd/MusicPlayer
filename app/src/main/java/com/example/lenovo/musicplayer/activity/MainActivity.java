@@ -1,11 +1,13 @@
 package com.example.lenovo.musicplayer.activity;
 
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.PersistableBundle;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -20,8 +22,10 @@ import android.widget.Toast;
 import com.example.lenovo.musicplayer.R;
 import com.example.lenovo.musicplayer.fragment.HomeFragment;
 import com.example.lenovo.musicplayer.fragment.LoginFragment;
+import com.example.lenovo.musicplayer.fragment.MusicFragment;
 import com.example.lenovo.musicplayer.fragment.RegisterFragment;
 import com.example.lenovo.musicplayer.service.PlayService;
+import com.nostra13.universalimageloader.utils.L;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -38,8 +42,8 @@ public class MainActivity extends AppCompatActivity
 
     public static BmobUser user = new BmobUser();
     private static boolean logout = false;
-    boolean serviceBound = false;
-    private PlayService player;
+    protected PlayService mPlayService;
+    private final String TAG = MainActivity.class.getSimpleName();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +65,8 @@ public class MainActivity extends AppCompatActivity
                     HomeFragment.getHomeFragment()).commit();
             navigationView.setCheckedItem(R.id.nav_home);
         }
+
+        startService(new Intent(this, PlayService.class));
         Bmob.initialize(this, "163858a36e4095d164e352750e1244c7");
         File path = new File(getCacheDir().getAbsolutePath());
         String[] fileList = path.list();
@@ -176,39 +182,54 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
-    @Override
-    public void onSaveInstanceState(Bundle outState, PersistableBundle outPersistentState) {
-        super.onSaveInstanceState(outState, outPersistentState);
-        outState.putBoolean("serviceStatus", serviceBound);
-    }
-
-    @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-        serviceBound = savedInstanceState.getBoolean("serviceStatus");
-    }
-
-    public boolean getServiceBound() {
-        return serviceBound;
-    }
-
-    private ServiceConnection serviceConnection = new ServiceConnection() {
+    private ServiceConnection mPlayServiceConnection = new ServiceConnection() {
         @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            // We've bound to LocalService, cast the IBinder and get LocalService instance
-            PlayService.LocalBinder binder = (PlayService.LocalBinder) service;
-            player = binder.getService();
-            serviceBound = true;
+        public void onServiceDisconnected(ComponentName name) {
+            L.i(TAG, "play--->onServiceDisconnected");
+            mPlayService = null;
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName name) {
-            serviceBound = false;
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mPlayService = ((PlayService.PlayBinder) service).getService();
+            mPlayService.setOnMusicEventListener(mMusicEventListener);
+            onChange(mPlayService.getPlayingPosition());
         }
     };
 
-    public ServiceConnection getServiceConnection() {
-        return serviceConnection;
+    private PlayService.OnMusicEventListener mMusicEventListener =
+            new PlayService.OnMusicEventListener() {
+                @Override
+                public void onPublish(int progress) {
+                    MainActivity.this.onPublish(progress);
+                }
+
+                @Override
+                public void onChange(int position) {
+                    MainActivity.this.onChange(position);
+                }
+            };
+
+    public void allowBindService() {
+        bindService(new Intent(this, PlayService.class),
+                mPlayServiceConnection,
+                Context.BIND_AUTO_CREATE);
+    }
+
+    public void allowUnbindService() {
+        unbindService(mPlayServiceConnection);
+    }
+
+    public void onPublish(int progress) {
+
+    }
+
+    public void onChange(int position) {
+        HomeFragment.getHomeFragment().getmMusicFragment().onPlay(position);
+    }
+
+    public PlayService getPlayService() {
+        return mPlayService;
     }
 
     public static BmobUser getUser() {
@@ -217,12 +238,8 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onDestroy() {
+        stopService(new Intent(this, PlayService.class));
         super.onDestroy();
-        if (serviceBound) {
-            unbindService(serviceConnection);
-            //service is active
-            player.stopSelf();
-        }
     }
 
 }

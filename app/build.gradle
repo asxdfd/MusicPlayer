@@ -6,6 +6,7 @@ android {
         applicationId "com.example.lenovo.musicplayer"
         minSdkVersion 15
         targetSdkVersion 28
+        multiDexEnabled true
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
@@ -47,4 +48,7 @@ dependencies {
     implementation project(':jcvideoplayer-lib')
     implementation project(path: ':jcvideoplayer-lib')
     implementation 'org.jsoup:jsoup:1.11.3'
+    implementation files('libs/jdom-2.0.6.jar')
+    implementation files('libs/json-lib-2.4-jdk15.jar')
+    implementation 'com.android.support:multidex:1.0.3'
 }

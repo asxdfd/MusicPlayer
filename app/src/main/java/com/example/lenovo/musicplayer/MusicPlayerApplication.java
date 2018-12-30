@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Environment;
+import android.support.multidex.MultiDexApplication;
 import android.util.DisplayMetrics;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -33,7 +34,7 @@ import fm.jiecao.jcvideoplayer_lib.JCVideoPlayer;
  * Student ID: 16301170
  * date: 2018/12/26
  */
-public class MusicPlayerApplication extends Application {
+public class MusicPlayerApplication extends MultiDexApplication {
 
     public static Context sContext;
     public static int sScreenWidth;
@@ -48,10 +49,7 @@ public class MusicPlayerApplication extends Application {
 //                R.color.bottom_bg, R.drawable.skin_enlarge_video, R.drawable.skin_shrink_video);
         //这里将会改变所有缩略图的ScaleType | Here will change all thumbnails ScaleType
         JCVideoPlayer.setThumbImageViewScalType(ImageView.ScaleType.FIT_XY);
-        super.onCreate();
         sContext = getApplicationContext();
-
-        startService(new Intent(this, PlayService.class));
 
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics dm = new DisplayMetrics();

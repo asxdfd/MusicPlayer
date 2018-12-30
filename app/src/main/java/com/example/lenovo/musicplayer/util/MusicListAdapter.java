@@ -11,60 +11,67 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.example.lenovo.musicplayer.MusicPlayerApplication;
 import com.example.lenovo.musicplayer.R;
 import com.example.lenovo.musicplayer.model.Music;
 
+import org.jsoup.Connection;
+
 import java.util.List;
 
-public class MusicListAdapter extends RecyclerView.Adapter<MusicListAdapter.ViewHolder> {
+public class MusicListAdapter extends BaseAdapter {
+    private int mPlayingPosition;
 
-    private final List<Music> mValues;
-    private Context context;
+    public void setPlayingPosition(int position) {
+        mPlayingPosition = position;
+    }
 
-    public MusicListAdapter(List<Music> items, Context context) {
-        mValues = items;
-        this.context = context;
+    public int getPlayingPosition() {
+        return mPlayingPosition;
     }
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        //Inflate the layout, initialize the View Holder
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.music_item, parent, false);
-        ViewHolder holder = new ViewHolder(v);
-        return holder;
+    public int getCount() {
+        return MusicUtil.sMusicList.size();
     }
 
     @Override
-    public void onBindViewHolder(ViewHolder holder, int position) {
-        //Use the provided View Holder on the onCreateViewHolder method to populate the current row on the RecyclerView
-        holder.mNameView.setText(mValues.get(position).getName());
-        holder.mSingerView.setText(mValues.get(position).getSinger());
+    public Object getItem(int position) {
+        return MusicUtil.sMusicList.get(position);
     }
 
     @Override
-    public int getItemCount() {
-        //returns the number of elements the RecyclerView will display
-        return mValues.size();
+    public long getItemId(int position) {
+        return position;
     }
 
     @Override
-    public void onAttachedToRecyclerView(RecyclerView recyclerView) {
-        super.onAttachedToRecyclerView(recyclerView);
-    }
+    public View getView(int position, View convertView, ViewGroup parent) {
+        final ViewHolder holder ;
 
-    class ViewHolder extends RecyclerView.ViewHolder {
-        public final TextView mNameView;
-        public final TextView mSingerView;
-
-        public ViewHolder(View view) {
-            super(view);
-            mNameView = (TextView) view.findViewById(R.id.item_name);
-            mSingerView = (TextView) view.findViewById(R.id.item_singer);
+        if(convertView == null) {
+            convertView = View.inflate(MusicPlayerApplication.sContext, R.layout.music_item, null);
+            holder = new ViewHolder();
+            holder.image = (ImageView) convertView.findViewById(R.id.item_img);
+            holder.title = (TextView) convertView.findViewById(R.id.item_name);
+            holder.artist = (TextView) convertView.findViewById(R.id.item_singer);
+            convertView.setTag(holder);
+        }else {
+            holder = (ViewHolder) convertView.getTag();
         }
 
-        @Override
-        public String toString() {
-            return super.toString();
-        }
+        holder.image.setImageResource(R.drawable.ic_item_music);
+        holder.title.setText(MusicUtil.sMusicList.get(position).getName());
+        holder.artist.setText(MusicUtil.sMusicList.get(position).getSinger());
+        holder.url = MusicUtil.sMusicList.get(position).getUrl();
+
+        return convertView;
+    }
+
+    static class ViewHolder {
+        ImageView image;
+        TextView title;
+        TextView artist;
+        String url;
     }
 }

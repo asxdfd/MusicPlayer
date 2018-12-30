@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 import com.ashokvarma.bottomnavigation.BottomNavigationBar;
 import com.ashokvarma.bottomnavigation.BottomNavigationItem;
 import com.example.lenovo.musicplayer.R;
+import com.example.lenovo.musicplayer.model.Music;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -177,5 +178,9 @@ public class HomeFragment extends Fragment implements BottomNavigationBar.OnTabS
     public interface OnFragmentInteractionListener {
         // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
+    }
+
+    public MusicFragment getmMusicFragment() {
+        return mMusicFragment;
     }
 }
